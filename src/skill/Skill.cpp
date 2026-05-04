@@ -214,7 +214,9 @@ void Skill::triggerThunder(std::vector<Enemy*>& enemies) {
 }
 
 void Skill::triggerShieldCollision(std::vector<Enemy*>& enemies) {
-    // Tao khiên moi dua tren timer
+    float dt = GetFrameTime();
+    
+    // 1. Logic Spawn (Tạo khiên)
     if (type == SKILL_SHIELD && shield_timer >= stats.cooldown) {
         shield_timer = 0.0f;
         for (int i = 0; i < stats.count; i++) {
@@ -223,62 +225,58 @@ void Skill::triggerShieldCollision(std::vector<Enemy*>& enemies) {
         }
     }
 
-    // Check va cham cho nhung cai khiên dang bay
-    for (auto& shield : activeShields) {
-        if (!shield.active) continue;
-        for (Enemy* enemy : enemies) {
-            if (!enemy) continue;
-            if (CheckCollisionCircles(shield.pos, shield.radius, {enemy->getX(), enemy->getY()}, 20)) {
-                enemy->takeDamage(stats.damage);
+    // 2. Logic Update & Collision
+    for (auto& s : activeShields) {
+        if (!s.active) continue;
+        s.pos.x += s.speed.x * dt;
+        s.pos.y += s.speed.y * dt;
+        if (gCollisionMap.isLoaded()) {
+            if (s.pos.x < 0 || s.pos.x > gCollisionMap.getWidth()) { s.speed.x *= -1; s.bounces++; }
+            if (s.pos.y < 0 || s.pos.y > gCollisionMap.getHeight()) { s.speed.y *= -1; s.bounces++; }
+        }
+        if (s.bounces > 3) { s.active = false; continue; }
+        for (Enemy* e : enemies) {
+            if (e && CheckCollisionCircles(s.pos, s.radius, {e->getX(), e->getY()}, 20)) {
+                e->takeDamage(stats.damage);
             }
         }
     }
 }
 
 void Skill::triggerHammerCollision(std::vector<Enemy*>& enemies) {
+    float dt = GetFrameTime();
+    
+    // 1. Logic Spawn (Ném búa)[cite: 17]
     if (type == SKILL_HAMMER && hammer_timer >= stats.cooldown && !enemies.empty()) {
         Enemy* target = findNearestEnemy(enemies);
         if (target) {
             hammer_timer = 0.0f;
-
-            // Huong goc toi quai
-            Vector2 baseDir = NormalizeOrFallback(Vector2Subtract({target->getX(), target->getY()}, {x, y}));
+            Vector2 baseDir = Vector2Normalize(Vector2Subtract({target->getX(), target->getY()}, {x, y}));
             float baseAngle = atan2f(baseDir.y, baseDir.x);
 
-            // Nem theo so luong
             for (int i = 0; i < stats.count; i++) {
-                // Tinh do lech goc: 20 do moi tia
                 float spread = 20.0f * DEG2RAD;
-                float offset = (i - stats.count / 2) * spread;
-                if (stats.count % 2 == 0) offset += 10.0f * DEG2RAD;
+                float offset = (i - stats.count / 2.0f) * spread;
                 float finalAngle = baseAngle + offset;
-                Vector2 finalDir = {cosf(finalAngle), sinf(finalAngle)};
-
-                activeHammers.push_back({
-                    {x, y},
-                    Vector2Scale(finalDir, stats.speed),
-                    true,
-                    0,
-                    stats.special,
-                    nullptr
-                });
+                activeHammers.push_back({{x, y}, {cosf(finalAngle) * stats.speed, sinf(finalAngle) * stats.speed}, true, 0, stats.special, nullptr});
             }
         }
     }
 
-    // Logic bay xuyen cho bua va riu
-    for (auto& hammer : activeHammers) {
-        if (!hammer.active) continue;
+    // 2. Logic Update & Collision
+    for (auto& h : activeHammers) {
+        if (!h.active) continue;
+        h.pos.x += h.speed.x * dt;
+        h.pos.y += h.speed.y * dt;
+        if (Vector2Distance(h.pos, {player->getX(), player->getY()}) > 1200.0f) {
+            h.active = false;
+            continue;
+        }
 
-        for (Enemy* enemy : enemies) {
-            if (!enemy) continue;
-            // Bo qua neu vua moi chem con quai nay o frame truoc
-            if (hammer.lastHitEnemy == (void*)enemy) continue;
-            if (CheckCollisionCircles(hammer.pos, 25, {enemy->getX(), enemy->getY()}, 20)) {
-                // Gay sat thuong 1 lan duy nhat
-                enemy->takeDamage(stats.damage);
-                // Danh dau muc tieu vua trung de tranh lap damage lien tuc
-                hammer.lastHitEnemy = (void*)enemy;
+        for (Enemy* e : enemies) {
+            if (e && h.lastHitEnemy != (void*)e && CheckCollisionCircles(h.pos, 25, {e->getX(), e->getY()}, 20)) {
+                e->takeDamage(stats.damage);
+                h.lastHitEnemy = (void*)e; // Chặn lặp sát thương
             }
         }
     }
