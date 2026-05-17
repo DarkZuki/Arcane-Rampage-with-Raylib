@@ -28,7 +28,7 @@ int Player::getExpToNextLevel() const {
 }
 
 void Player::setScore(int newScore) {
-    // Không cho score âm để tránh trạng thái sai và có case test rõ ràng
+    // Không cho score âm để tránh trạng thái sai 
     if (newScore < MIN_PLAYER_SCORE) {
         throw std::invalid_argument("Player::setScore - score must be >= 0");
     }
@@ -73,8 +73,8 @@ void Player::levelUp() {
     
     maxHp += 20;           // +20 max HP 
     hp = maxHp;            // Hồi full máu
-    speed += 0.2f;         // +0.2 
-    damage += 5;           // +5 
+    speed += 0.05f;         // +0.2 
+    damage += 2;           // +5 
 }
 
 // Hàm cập nhật vị trí ng chơi liên tục
@@ -150,13 +150,13 @@ void Player::draw() {
     float frameWidth = (float)currentTexture.width;
     float frameHeight = (float)currentTexture.height;
     int currentFrame = 0;
-    float drawWidth = 80.0f;
-    float drawHeight = 80.0f;
+    float drawWidth = 110.0f;
+    float drawHeight = 110.0f;
 
     if (isWalking) {
         frameWidth = (float)currentTexture.width / 8.0f;
         currentFrame = walkFrame;
-        drawHeight = 200.0f;
+        drawHeight = 250.0f;
         drawWidth = drawHeight * (frameWidth / frameHeight);
     }
 
@@ -166,6 +166,6 @@ void Player::draw() {
     }
     Rectangle dest = {x - drawWidth / 2.0f, y - drawHeight / 2.0f, drawWidth, drawHeight};
     DrawTexturePro(currentTexture, source, dest, {0.0f, 0.0f}, 0.0f, WHITE);
-    DrawText(TextFormat("HP: %d/%d", hp, maxHp), x - 45, y - 54, 18, WHITE);
-    DrawText(TextFormat("LV: %d", level), x - 27, y - 76, 18, YELLOW);
+    DrawText(TextFormat("HP: %d/%d", hp, maxHp), x - 45, y - 63, 18, WHITE);
+    DrawText(TextFormat("LV: %d", level), x - 27, y - 85, 18, YELLOW);
 }

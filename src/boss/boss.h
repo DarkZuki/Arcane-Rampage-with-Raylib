@@ -24,6 +24,7 @@ public:
     void draw() override;
     void takeDamage(int damage) override;
     void initMaxHp();
+    float getVisualYOffset() const override { return 0.0f; }
     
 }; 
 

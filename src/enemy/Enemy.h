@@ -34,6 +34,8 @@ public:
     void update() override;
     void draw() override;
     bool canShoot();
+    virtual float getVisualYOffset() const;
+    float getCollisionCenterY() const { return y - getVisualYOffset(); }
     
     // Getters
     int getHp() const { return hp; }
@@ -44,17 +46,17 @@ public:
     int getExpReward() {
         switch(enemyType){
             case 1 : return 50; // FAST
-            case 2 : return 60; // TANK
-            case 3 : return 70; // RANGED
+            case 2 : return 70; // TANK
+            case 3 : return 60; // RANGED
             default: return 40; // NORMAL
         }
     }
     int getScoreReward() {
         switch(enemyType) {
-            case 1 : return 15;
-            case 2 : return 25;
-            case 3 : return 20;
-            default: return 10;
+            case 1 : return 50;
+            case 2 : return 70;
+            case 3 : return 60;
+            default: return 40;
         }
     }
     

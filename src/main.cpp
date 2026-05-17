@@ -18,6 +18,14 @@
 #include "upgrade/UpgradeSystem.h"
 using namespace std;
 
+bool saveGame(const char* fileName, Player& player, WaveManager& waveSystem, float gameTimer, int currentDiffID,
+              const vector<Weapon*>& allWeapons, const vector<Weapon*>& weaponInventory, Weapon* currentWeapon,
+              const vector<Skill*>& allSkills, const vector<Skill*>& skillInventory);
+bool loadGame(const char* fileName, Player& player, WaveManager& waveSystem, float& gameTimer, int& currentDiffID,
+              bool& shouldShowUpgrade, int& previousLevel, const vector<Weapon*>& allWeapons,
+              vector<Weapon*>& weaponInventory, Weapon*& currentWeapon, const vector<Skill*>& allSkills,
+              vector<Skill*>& skillInventory);
+
 // Tai sprite cho 5 loai enemy vao mang dung chung
 void loadEnemySprites(Texture2D sprites[]) {
     const char* paths[5] = {
@@ -61,6 +69,21 @@ void drawTitleScreen(Texture2D mainScreen) {
         
     }
     EndDrawing();
+}
+
+// Ve thong bao tam thoi sau khi save game
+void drawSaveStatusMessage(const char* message, float timer) {
+    if (message == nullptr || timer <= 0.0f) return;
+
+    int fontSize = 36;
+    int textWidth = MeasureText(message, fontSize);
+    int boxWidth = textWidth + 64;
+    int boxHeight = 72;
+    int boxX = (GetScreenWidth() - boxWidth) / 2;
+    int boxY = (GetScreenHeight() - boxHeight) / 2;
+
+    DrawRectangleRounded(Rectangle{(float)boxX, (float)boxY, (float)boxWidth, (float)boxHeight}, 0.25f, 8, Fade(BLACK, 0.72f));
+    DrawText(message, boxX + 32, boxY + 18, fontSize, WHITE);
 }
 
 // Ve phan world ben trong camera cua player
@@ -171,7 +194,7 @@ bool drawVictory(WaveManager& waveSystem, vector<Enemy*>& enemies, vector<Entity
 void fireEnemyBullets(vector<Enemy*>& enemies, Player& player, vector<Bullet*>& bullets, vector<Entity*>& entities) {
     for (auto e : enemies) {
         if (e->getEnemyType() != 3 || !e->canShoot()) continue;
-        Bullet* bullet = new Bullet(e->getX(), e->getY(), player.getX(), player.getY(), e->getDamage());
+        Bullet* bullet = new Bullet(e->getX(), e->getCollisionCenterY(), player.getX(), player.getY(), e->getDamage());
         bullet->setIsEnemyBullet(true);
         bullets.push_back(bullet);
         entities.push_back(bullet);
@@ -245,6 +268,9 @@ int main() {
         int currentDiffID = -1;
         bool gameStarted = false;
         bool showTitleScreen = true;
+        const char* saveFile = "savegame.txt";
+        const char* saveStatusMessage = nullptr;
+        float saveStatusTimer = 0.0f;
 
         // Danh sach skill tong va inventory skill dang trang bi
         vector<Skill*> allSkills = {
@@ -272,6 +298,27 @@ int main() {
 
         // Vong lap game chinh
         while (!WindowShouldClose()) {
+        float frameDt = GetFrameTime();
+        if (saveStatusTimer > 0.0f) {
+            saveStatusTimer -= frameDt;
+            if (saveStatusTimer <= 0.0f) {
+                saveStatusTimer = 0.0f;
+                saveStatusMessage = nullptr;
+            }
+        }
+
+        if (IsKeyPressed(KEY_F9)) {
+            if (loadGame(saveFile, player, waveSystem, gameTimer, currentDiffID, shouldShowUpgrade, previousLevel, allWeapons, weaponInventory, currentWeapon, allSkills, skillInventory)) {
+                showTitleScreen = false;
+                gameStarted = true;
+                isPaused = false;
+                saveStatusMessage = "Loaded data !";
+            } else {
+                saveStatusMessage = "Failed to load data !";
+            }
+            saveStatusTimer = 2.5f;
+        }
+
         if (showTitleScreen) {
             if (IsKeyPressed(KEY_SPACE)) showTitleScreen = false;
             drawTitleScreen(mainScreenTexture);
@@ -292,7 +339,14 @@ int main() {
                 if (!gameStarted) continue;
             }
 
-            float dt = GetFrameTime();
+            float dt = frameDt;
+
+            if (IsKeyPressed(KEY_F5)) {
+                bool saved = saveGame(saveFile, player, waveSystem, gameTimer, currentDiffID, allWeapons, weaponInventory, currentWeapon, allSkills, skillInventory);
+                saveStatusMessage = saved ? "Saved data !" : "Failed to save data !";
+                saveStatusTimer = 2.5f;
+            }
+
             if (updateUpgradeMenu(player, upgradeSystem, allSkills, skillInventory, allWeapons, weaponInventory, currentWeapon, floorTexture, wallsTexture, entities, weaponProjectiles)) continue;
 
             // Moi lan len level thi mo them 1 lan upgrade menu
@@ -349,7 +403,7 @@ int main() {
                 float hitboxRadius = waveSystem.getCurrentWaveNumber() == 20 ? 80.0f : 20.0f;
                 for (size_t j = 0; j < bullets.size(); j++) {
                     if (!bullets[j]->getIsEnemyBullet() &&
-                        Vector2Distance({bullets[j]->getX(), bullets[j]->getY()}, {enemies[i]->getX(), enemies[i]->getY()}) < hitboxRadius) {
+                        Vector2Distance({bullets[j]->getX(), bullets[j]->getY()}, {enemies[i]->getX(), enemies[i]->getCollisionCenterY()}) < hitboxRadius) {
                         enemies[i]->getDamage();
                         bullets[j]->setX(-1000);
                     }
@@ -361,7 +415,7 @@ int main() {
 
             // Enemy cham vao player se gay damage contact
             for (auto enemy : enemies) {
-                if (Vector2Distance({player.getX(), player.getY()}, {enemy->getX(), enemy->getY()}) < 30.0f) player.takeDamage(enemy->getDamage());
+                if (Vector2Distance({player.getX(), player.getY()}, {enemy->getX(), enemy->getCollisionCenterY()}) < 30.0f) player.takeDamage(enemy->getDamage());
             }
 
             // Dan enemy trung player se bi xoa khoi scene
@@ -451,6 +505,8 @@ int main() {
        
 
         DrawText(TextFormat("Score: %d", player.getScore()), 24, 144, 36, WHITE);
+        DrawText("F5: Save   F9: Load", 24, 220, 24, LIGHTGRAY);
+        drawSaveStatusMessage(saveStatusMessage, saveStatusTimer);
         // Hien thi wave va thoi gian song sot
         int total = (int)waveSystem.getInternalTimer();
         int waveMins = (int)(total / 60);
@@ -503,33 +559,33 @@ int main() {
             DrawText(skillInventory[2]->getName(), skillSlot3.x + 8, skillSlot3.y + 50, 18, WHITE);
         }
 
-         // NĂ¡ÂºÂ¾U Ă„ÂANG PAUSE THÄ‚Å’ VĂ¡ÂºÂ¼ BĂ¡ÂºÂ¢NG MENU
+        // Nếu đang pause thì vẽ bảng menu
         if (isPaused) {
-            // VĂ¡ÂºÂ½ lĂ¡Â»â€ºp nĂ¡Â»Ân mĂ¡Â»Â Ă„â€˜Ä‚Â¨ lÄ‚Âªn game
-            // DrawRectangle(0, 0, 1920, 1040, Fade(BLACK, 0.6f));
+            // Vẽ lớp nền mờ đè lên game
+            DrawRectangle(0, 0, 1920, 1040, Fade(BLACK, 0.6f));
 
-            // // VĂ¡ÂºÂ½ cÄ‚Â¡i bĂ¡ÂºÂ£ng Menu Ă¡Â»Å¸ giĂ¡Â»Â¯a
-            // DrawRectangle(660, 250, 600, 420, RAYWHITE);
-            // DrawText("GAME PAUSED", 765, 310, 54, BLACK);
+            // Vẽ bảng menu ở giữa
+            DrawRectangle(660, 250, 600, 420, RAYWHITE);
+            DrawText("GAME PAUSED", 765, 310, 54, BLACK);
 
-            // NÄ‚Âºt RESUME
+            // Nút Resume
             Rectangle resumeBtn = { 760, 410, 400, 80 };
-            // DrawRectangleRec(resumeBtn, LIGHTGRAY);
-            // DrawText("RESUME", 870, 432, 36, BLACK);
+            DrawRectangleRec(resumeBtn, LIGHTGRAY);
+            DrawText("RESUME", 870, 432, 36, BLACK);
 
-            // NÄ‚Âºt EXIT
+            // Nút Exit
             Rectangle exitBtn = { 760, 530, 400, 80 };
-            // DrawRectangleRec(exitBtn, RED);
-            // DrawText("EXIT", 915, 552, 36, WHITE);
+            DrawRectangleRec(exitBtn, RED);
+            DrawText("EXIT", 915, 552, 36, WHITE);
 
-            // Check click vÄ‚Â o cÄ‚Â¡c nÄ‚Âºt trong Menu
+            // Kiểm tra click vào các nút trong Menu
             if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
                 Vector2 mousePos = GetMousePosition();
                 if (CheckCollisionPointRec(mousePos, resumeBtn)) {
-                    isPaused = false; // ChĂ¡ÂºÂ¡y tiĂ¡ÂºÂ¿p
+                    isPaused = false; // Chạy tiếp
                 }
                 if (CheckCollisionPointRec(mousePos, exitBtn)) {
-                    break; // ThoÄ‚Â¡t vÄ‚Â²ng lĂ¡ÂºÂ·p main -> Out game
+                    break; // Thoát vòng lặp main -> thoát game
                 }
             }
         }
