@@ -1,7 +1,6 @@
 #include "raylib.h"
 #include "raymath.h"
 #include <vector>
-#include <algorithm>
 #include <cmath>
 #include <exception>
 
@@ -147,49 +146,6 @@ void spawnHpItem(vector<Item*>& items, vector<Entity*>& entities) {
     entities.push_back(hpItem);
 }
 
-// Ve man hinh game over khi player het mau
-bool drawGameOver(Player& player, float gameTimer) {
-    if (player.getHp() > 0) return false;
-    int mins = (int)(gameTimer / 60), secs = (int)gameTimer % 60;
-    BeginDrawing();
-    ClearBackground(BLACK);
-    DrawText("GAME OVER", 722, 430, 72, RED);
-    DrawText(TextFormat("SCORE: %d", player.getScore()), 850, 556, 36, WHITE);
-    DrawText(TextFormat("TIME SURVIVED: %02d:%02d", mins, secs), 734, 628, 36, WHITE);
-    EndDrawing();
-    return true;
-}
-
-// Ve man hinh chien thang khi qua wave cuoi va diet boss
-bool drawVictory(WaveManager& waveSystem, vector<Enemy*>& enemies, vector<Entity*>& entities, Player& player) {
-    if (waveSystem.getCurrentWaveNumber() != 20 || !waveSystem.hasBossBeenSpawned()) return false;
-    bool bossIsAlive = false;
-    for (auto e : enemies) {
-        if (dynamic_cast<Boss*>(e) != nullptr) {
-            bossIsAlive = true;
-            break;
-            
-        }
-    }
-    if (bossIsAlive) return false;
-    if (!enemies.empty()) {
-        for (auto enemy : enemies){
-            removeEntity(entities, enemy);
-            delete enemy;
-        }
-        enemies.clear();
-    }
-    int total = (int)waveSystem.getInternalTimer(), mins = total / 60, secs = total % 60;
-    BeginDrawing();
-    ClearBackground(BLACK);
-    DrawText("VICTORY!", 660, 180, 108, GOLD);
-    DrawText("CONGRATULATIONS!", 612, 300, 54, WHITE);
-    DrawText(TextFormat("FINAL SCORE: %d", player.getScore()), 756, 420, 40, WHITE);
-    DrawText(TextFormat("TIME SURVIVED: %02d:%02d", mins, secs), 732, 492, 40, WHITE);
-    EndDrawing();
-    return true;
-}
-
 // Enemy ranged se tao bullet huong ve player khi den nhip ban
 void fireEnemyBullets(vector<Enemy*>& enemies, Player& player, vector<Bullet*>& bullets, vector<Entity*>& entities) {
     for (auto e : enemies) {
@@ -301,6 +257,40 @@ int main() {
         bool shouldShowUpgrade = true;
         int previousLevel = 1;
 
+        // Reset nhanh toan bo tran dau de quay ve man hinh PRESS SPACE TO PLAY
+        auto resetGameState = [&]() {
+            for (auto enemy : enemies) delete enemy;
+            enemies.clear();
+
+            for (auto bullet : bullets) delete bullet;
+            bullets.clear();
+
+            for (auto item : items) delete item;
+            items.clear();
+
+            weaponProjectiles.clear();
+            player = Player();
+            waveSystem = WaveManager();
+            upgradeSystem = UpgradeSystem();
+            entities = { &player };
+
+            for (auto weapon : allWeapons) weapon->setLevel(0);
+            for (auto skill : allSkills) skill->setLevel(0);
+            weaponInventory.clear();
+            skillInventory.clear();
+            currentWeapon = nullptr;
+
+            spawnTimer = 0.0f;
+            hpSpawnTimer = 0.0f;
+            gameTimer = 0.0f;
+            isPaused = false;
+            shouldShowUpgrade = true;
+            previousLevel = 1;
+            showTitleScreen = true;
+            gameStarted = false;
+            currentDiffID = -1;
+        };
+
         // Vong lap game chinh
         while (!WindowShouldClose()) {
         float frameDt = GetFrameTime();
@@ -378,12 +368,55 @@ int main() {
                 spawnHpItem(items, entities);
                 hpSpawnTimer = 0.0f;
             }
-            if (drawGameOver(player, gameTimer)) {
-                if (IsKeyPressed(KEY_ESCAPE)) break;
-                continue;
+            // Khi thua hoac thang thi dung gameplay va hien 2 lua chon Replay/Exit
+            bool gameOver = player.getHp() <= 0;
+            bool victory = false;
+            if (!gameOver && waveSystem.getCurrentWaveNumber() == 20 && waveSystem.hasBossBeenSpawned()) {
+                victory = true;
+                for (auto e : enemies) {
+                    if (dynamic_cast<Boss*>(e) != nullptr) {
+                        victory = false;
+                        break;
+                    }
+                }
+                if (victory) {
+                    for (auto enemy : enemies) {
+                        removeEntity(entities, enemy);
+                        delete enemy;
+                    }
+                    enemies.clear();
+                }
             }
-            if (drawVictory(waveSystem, enemies, entities, player)) {
-                if (IsKeyPressed(KEY_ESCAPE)) break;
+
+            if (gameOver || victory) {
+                int total = gameOver ? (int)gameTimer : (int)waveSystem.getInternalTimer();
+                int mins = total / 60;
+                int secs = total % 60;
+                Rectangle replayBtn = { 660, 660, 240, 74 };
+                Rectangle exitBtn = { 1020, 660, 240, 74 };
+                Vector2 mousePos = GetMousePosition();
+
+                BeginDrawing();
+                ClearBackground(BLACK);
+                if (gameOver) {
+                    DrawText("GAME OVER", 722, 360, 72, RED);
+                    DrawText(TextFormat("SCORE: %d", player.getScore()), 756, 486, 36, WHITE);
+                } else {
+                    DrawText("VICTORY!", 660, 120, 108, GOLD);
+                    DrawText("CONGRATULATIONS!", 612, 240, 54, WHITE);
+                    DrawText(TextFormat("FINAL SCORE: %d", player.getScore()), 756, 486, 36, WHITE);
+                }
+                DrawText(TextFormat("TIME SURVIVED: %02d:%02d", mins, secs), 734, 558, 36, WHITE);
+                DrawRectangleRec(replayBtn, BLUE);
+                DrawRectangleRec(exitBtn, RED);
+                DrawText("REPLAY", 710, 681, 34, WHITE);
+                DrawText("EXIT", 1095, 681, 34, WHITE);
+                EndDrawing();
+
+                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+                    if (CheckCollisionPointRec(mousePos, replayBtn)) resetGameState();
+                    if (CheckCollisionPointRec(mousePos, exitBtn)) break;
+                }
                 continue;
             }
 
@@ -612,6 +645,10 @@ int main() {
         EndDrawing();
         }
         // Giai phong texture/asset o cuoi chuong trinh vi chung duoc load mot lan va dung xuyen suot tran dau.
+        for (auto enemy : enemies) delete enemy;
+        for (auto bullet : bullets) delete bullet;
+        for (auto item : items) delete item;
+        for (auto skill : allSkills) delete skill;
         for (int i=0; i<5 ; i++){
             UnloadTexture(enemySprites[i]);
         }
