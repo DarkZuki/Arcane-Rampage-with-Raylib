@@ -427,7 +427,10 @@ int main() {
 
             // Enemy cham vao player se gay damage contact
             for (auto enemy : enemies) {
-                if (Vector2Distance({player.getX(), player.getY()}, {enemy->getX(), enemy->getCollisionCenterY()}) < 30.0f) player.takeDamage(enemy->getDamage());
+                if (Vector2Distance({player.getX(), player.getY()}, {enemy->getX(), enemy->getY()}) < 30.0f) {
+                    player.takeDamage(enemy->getDamage());
+                    player.triggerHitFlash();
+                }
             }
 
             // Dan enemy trung player se bi xoa khoi scene
@@ -435,6 +438,7 @@ int main() {
                 if (bullets[j]->getIsEnemyBullet() &&
                     Vector2Distance({bullets[j]->getX(), bullets[j]->getY()}, {player.getX(), player.getY()}) < 15.0f) {
                     player.takeDamage(bullets[j]->getDamage());
+                    player.triggerHitFlash();
                     removeEntity(entities, bullets[j]);
                     bullets.erase(bullets.begin() + j);
                     j--;

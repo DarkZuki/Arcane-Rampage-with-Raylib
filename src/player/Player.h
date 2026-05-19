@@ -26,7 +26,8 @@ private:
     int walkFrame = 0;
     float walkTimer = 0.0f;
     bool isWalking = false;
-    
+    float hitFlashTimer = 0.0f;
+    float hitFlashDuration = 0.25f;
 public:
     // Constructor
     Player();
@@ -61,5 +62,5 @@ public:
     // Xu ly logic tang level va tang chi so
     bool checkLevelUp(); // Check if player can level up and perform level up
     void levelUp(); // Perform level up with stat increases
-    
+    void triggerHitFlash();
 };

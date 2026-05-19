@@ -76,7 +76,9 @@ void Player::levelUp() {
     speed += 0.05f;         // +0.2 
     damage += 2;           // +5 
 }
-
+void Player::triggerHitFlash() {
+    hitFlashTimer = hitFlashDuration;
+}
 // Hàm cập nhật vị trí ng chơi liên tục
 void Player::update() {
     // Di chuyển và kiểm tra va chạm
@@ -109,6 +111,12 @@ void Player::update() {
             y = newPos.y;
         }
         // Ko cách nào dc thì ko đi
+    }
+    float dt = GetFrameTime();
+
+    if (hitFlashTimer > 0.0f) {
+        hitFlashTimer -= dt;
+        if (hitFlashTimer < 0.0f) hitFlashTimer = 0.0f;
     }
     
     // Giới hạn camera để ko nhìn ngoài map
@@ -165,6 +173,13 @@ void Player::draw() {
         source.width = -source.width;
     }
     Rectangle dest = {x - drawWidth / 2.0f, y - drawHeight / 2.0f, drawWidth, drawHeight};
+    Color tint = WHITE;
+    if (hitFlashTimer > 0.0f) {
+        int flashPhase = (int)(hitFlashTimer * 20);
+        if (flashPhase % 2 == 0) {
+            tint = RED;
+        }
+    } 
     DrawTexturePro(currentTexture, source, dest, {0.0f, 0.0f}, 0.0f, WHITE);
     DrawText(TextFormat("HP: %d/%d", hp, maxHp), x - 45, y - 63, 18, WHITE);
     DrawText(TextFormat("LV: %d", level), x - 27, y - 85, 18, YELLOW);
