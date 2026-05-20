@@ -1,4 +1,5 @@
 #include "Skill.h"
+#include "../core/AudioManager.h"
 #include "../enemy/Enemy.h"
 #include "raymath.h"
 #include "../core/CollisionMap.h"
@@ -156,6 +157,7 @@ void Skill::triggerLaser(std::vector<Enemy*>& enemies) {
     is_laser_active = true;
     laser_timer = 0.2f;
     laser_cooldown_timer = stats.cooldown;
+    AudioManager::PlayLaser();
 
     // Gay sat thuong ngay lap tuc khi tia laser quet qua
     for (Enemy* enemy : enemies) {
@@ -195,6 +197,7 @@ void Skill::triggerThunder(std::vector<Enemy*>& enemies) {
     thunder_timer = 0.0f;
     // Thoi gian hien tia set tren man hinh
     thunderEffectTimer = 0.2f;
+    if (!thunderPositions.empty()) AudioManager::PlayThunder();
 }
 
 
@@ -229,16 +232,20 @@ void Skill::triggerShieldCollision(std::vector<Enemy*>& enemies) {
         s.pos.x += s.speed.x * dt;
         s.pos.y += s.speed.y * dt;
         s.rotation += 500.0f * dt;
+        bool bounced = false;
         // 3. NẢY BẬT
         if ((s.pos.x < minW.x && s.speed.x < 0) || (s.pos.x > maxW.x && s.speed.x > 0)) {
             s.speed.x *= -1;
             s.bounces++;
+            bounced = true;
         }
         if ((s.pos.y < minW.y && s.speed.y < 0) || (s.pos.y > maxW.y && s.speed.y > 0)) {
             s.speed.y *= -1;
             s.bounces++;
+            bounced = true;
         }
         // 4. LOGIC XÓA DỰA TRÊN LEVEL
+        if (bounced) AudioManager::PlayShieldImpact();
         bool isTooFar = Vector2Distance({player->getX(), player->getY()}, s.pos) > stats.range;
         // Nếu nảy quá nhiều (ví dụ 6 lần) HOẶC vượt quá tầm xa của Level hiện tại
         if (s.bounces >= 3 || isTooFar) {
@@ -264,6 +271,7 @@ void Skill::triggerHammerCollision(std::vector<Enemy*>& enemies) {
         Enemy* target = findNearestEnemy(enemies);
         if (target) {
             hammer_timer = 0.0f;
+            AudioManager::PlayHammerSmash();
             // Hướng gốc từ Player thẳng tới quái
             Vector2 baseDir = NormalizeOrFallback(Vector2Subtract({target->getX(), target->getCollisionCenterY()}, {player->getX(), player->getY()}));
             

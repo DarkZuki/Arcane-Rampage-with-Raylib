@@ -1,4 +1,5 @@
 #include "weapon.h"
+#include "../core/AudioManager.h"
 #include "WeaponLevel.h"
 #include "raylib.h"
 #include "raymath.h"
@@ -81,6 +82,7 @@ void Weapon::attack(Player& player, const std::vector<Enemy*>& enemies,
                 }
             }
             projectiles.push_back({playerPos, {0, 0}, 0.2f, stats.range, 0, ORANGE, 1, 0});
+            AudioManager::PlayHammerSmash();
             break;
 
         case 1: {
@@ -97,6 +99,7 @@ void Weapon::attack(Player& player, const std::vector<Enemy*>& enemies,
                     shotsFired++;
                 }
             }
+            if (shotsFired > 0) AudioManager::PlayMagicWand();
             break;
         }
 
@@ -111,6 +114,7 @@ void Weapon::attack(Player& player, const std::vector<Enemy*>& enemies,
                 projectiles.push_back({playerPos, {velocity.x * stats.speed, velocity.y * stats.speed},
                                        1.0f, 8.0f, (float)totalDamage, SKYBLUE, 4, 0});
             }
+            AudioManager::PlayKnife();
             break;
         }
 
@@ -126,6 +130,7 @@ void Weapon::attack(Player& player, const std::vector<Enemy*>& enemies,
                 projectiles.push_back({playerPos, {velocity.x * stats.speed, velocity.y * stats.speed},
                                        2.0f, SPELL_BOOK_HITBOX_RADIUS, (float)totalDamage, PURPLE, 2, stats.explosionRadius});
             }
+            AudioManager::PlayFireBall();
             break;
         }
     }
@@ -159,6 +164,7 @@ void updateProjectiles(std::vector<WeaponProjectile>& projectiles, std::vector<E
                             }
                         }
                         effects.push_back({projectile.position, {0, 0}, 0.3f, 0, 0, ORANGE, 3, projectile.angle});
+                        AudioManager::PlayExplosion();
                     }
 
                     projectile.lifeTime = 0;

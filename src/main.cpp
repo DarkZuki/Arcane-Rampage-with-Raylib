@@ -4,6 +4,7 @@
 #include <cmath>
 #include <exception>
 
+#include "core/AudioManager.h"
 #include "core/Entity.h"
 #include "core/CollisionMap.h"
 #include "player/Player.h"
@@ -200,6 +201,7 @@ int main() {
         InitWindow(1920, 1040, "Arcane Rampage");
         SetExitKey(KEY_NULL);
         SetTargetFPS(60);
+        AudioManager::Initialize();
         InitCollisionMap("Graphics/gameBgCollision.png");
 
         Texture2D enemySprites[5];
@@ -294,6 +296,7 @@ int main() {
         // Vong lap game chinh
         while (!WindowShouldClose()) {
         float frameDt = GetFrameTime();
+        AudioManager::Update();
 
         // Dem nguoc thoi gian hien thong bao save/load de toast tu bien mat sau vai giay.
         if (saveStatusTimer > 0.0f) {
@@ -311,6 +314,7 @@ int main() {
                 showTitleScreen = false;
                 gameStarted = true;
                 isPaused = false;
+                AudioManager::SetMusicState(AudioManager::MusicState::InGame);
                 saveStatusMessage = "Loaded data !";
             } else {
                 saveStatusMessage = "Failed to load data !";
@@ -319,6 +323,7 @@ int main() {
         }
 
         if (showTitleScreen) {
+            AudioManager::SetMusicState(AudioManager::MusicState::MainMenu);
             if (IsKeyPressed(KEY_SPACE)) showTitleScreen = false;
             drawTitleScreen(mainScreenTexture);
             continue;
@@ -331,10 +336,14 @@ int main() {
 
         if (!isPaused) {
             if (!gameStarted) {
+                AudioManager::SetMusicState(AudioManager::MusicState::MainMenu);
                 // Bat buoc chon difficulty truoc khi gameplay bat dau
                 currentDiffID = getDifficultyChoice();
                 gameStarted = currentDiffID >= 0;
-                if (gameStarted) waveSystem.setDifficulty(currentDiffID);
+                if (gameStarted) {
+                    waveSystem.setDifficulty(currentDiffID);
+                    AudioManager::SetMusicState(AudioManager::MusicState::InGame);
+                }
                 else drawDifficultyScreen();
                 if (!gameStarted) continue;
             }
@@ -389,6 +398,7 @@ int main() {
             }
 
             if (gameOver || victory) {
+                AudioManager::SetMusicState(gameOver ? AudioManager::MusicState::GameOver : AudioManager::MusicState::Victory);
                 int total = gameOver ? (int)gameTimer : (int)waveSystem.getInternalTimer();
                 int mins = total / 60;
                 int secs = total % 60;
@@ -656,12 +666,16 @@ int main() {
         UnloadTexture(floorTexture);
         UnloadTexture(wallsTexture);
         UnloadItemTextures();
+        AudioManager::Shutdown();
         CloseWindow();
         return 0;
     }
     catch (const std::exception& e) {
         //bắt ngoại lệ ở tầng cao nhất và thoát an toàn
         TraceLog(LOG_ERROR, "Fatal error: %s", e.what());
+        if (IsAudioDeviceReady()) {
+            AudioManager::Shutdown();
+        }
         if (IsWindowReady()) {
             CloseWindow();
         }
