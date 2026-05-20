@@ -341,6 +341,7 @@ int main() {
                 currentDiffID = getDifficultyChoice();
                 gameStarted = currentDiffID >= 0;
                 if (gameStarted) {
+                    TraceLog(LOG_INFO, "Difficulty selected: %d -> switching music to %s", currentDiffID, AudioManager::GetMusicStateName(AudioManager::MusicState::InGame));
                     waveSystem.setDifficulty(currentDiffID);
                     AudioManager::SetMusicState(AudioManager::MusicState::InGame);
                 }

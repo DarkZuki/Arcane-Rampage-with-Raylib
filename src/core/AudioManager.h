@@ -12,6 +12,7 @@ void Initialize();
 void Shutdown();
 void Update();
 void SetMusicState(MusicState state);
+const char* GetMusicStateName(MusicState state);
 
 void PlayFireBall();
 void PlayExplosion();

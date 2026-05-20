@@ -11,11 +11,12 @@ Sound g_laser = {};
 Sound g_magicWand = {};
 Sound g_shieldImpact = {};
 Sound g_thunder = {};
-Music g_mainMenuMusic = {};
-Music g_inGameMusic = {};
-Music g_gameOverMusic = {};
-Music g_victoryMusic = {};
-Music* g_currentMusic = nullptr;
+
+Sound g_mainMenuMusic = {};
+Sound g_gameOverMusic = {};
+Sound g_victoryMusic = {};
+Sound* g_currentMusic = nullptr;
+
 AudioManager::MusicState g_currentMusicState = AudioManager::MusicState::MainMenu;
 bool g_hasMusicState = false;
 bool g_initialized = false;
@@ -25,14 +26,34 @@ void PlayLoadedSound(const Sound& sound) {
     PlaySound(sound);
 }
 
-Music* GetMusicByState(AudioManager::MusicState state) {
+Sound* GetMusicByState(AudioManager::MusicState state) {
     switch (state) {
         case AudioManager::MusicState::MainMenu: return &g_mainMenuMusic;
-        case AudioManager::MusicState::InGame: return &g_inGameMusic;
+        case AudioManager::MusicState::InGame: return &g_mainMenuMusic;
         case AudioManager::MusicState::GameOver: return &g_gameOverMusic;
         case AudioManager::MusicState::Victory: return &g_victoryMusic;
     }
     return nullptr;
+}
+
+float GetMusicVolumeByState(AudioManager::MusicState state) {
+    switch (state) {
+        case AudioManager::MusicState::MainMenu: return 1.0f;
+        case AudioManager::MusicState::InGame: return 0.35f;
+        case AudioManager::MusicState::GameOver: return 1.0f;
+        case AudioManager::MusicState::Victory: return 1.0f;
+    }
+    return 1.0f;
+}
+
+const char* GetMusicStateLabel(AudioManager::MusicState state) {
+    switch (state) {
+        case AudioManager::MusicState::MainMenu: return "MainMenu";
+        case AudioManager::MusicState::InGame: return "InGame";
+        case AudioManager::MusicState::GameOver: return "GameOver";
+        case AudioManager::MusicState::Victory: return "Victory";
+    }
+    return "Unknown";
 }
 }
 
@@ -49,10 +70,11 @@ void Initialize() {
     g_magicWand = LoadSound("Sound/MagicWand.mp3");
     g_shieldImpact = LoadSound("Sound/ShieldImpact.mp3");
     g_thunder = LoadSound("Sound/Thunder.mp3");
-    g_mainMenuMusic = LoadMusicStream("Sound/Mainmenusound.mp3");
-    g_inGameMusic = LoadMusicStream("Sound/Ingamemusic.mp3");
-    g_gameOverMusic = LoadMusicStream("Sound/GameOver.mp3");
-    g_victoryMusic = LoadMusicStream("Sound/GameVictory.mp3");
+
+    g_mainMenuMusic = LoadSound("Sound/Mainmenusound.mp3");
+    g_gameOverMusic = LoadSound("Sound/GameOver.mp3");
+    g_victoryMusic = LoadSound("Sound/GameVictory.mp3");
+
     g_initialized = true;
     SetMusicState(MusicState::MainMenu);
 }
@@ -61,7 +83,7 @@ void Shutdown() {
     if (!g_initialized) return;
 
     if (g_currentMusic != nullptr) {
-        StopMusicStream(*g_currentMusic);
+        StopSound(*g_currentMusic);
         g_currentMusic = nullptr;
     }
 
@@ -73,10 +95,11 @@ void Shutdown() {
     UnloadSound(g_magicWand);
     UnloadSound(g_shieldImpact);
     UnloadSound(g_thunder);
-    UnloadMusicStream(g_mainMenuMusic);
-    UnloadMusicStream(g_inGameMusic);
-    UnloadMusicStream(g_gameOverMusic);
-    UnloadMusicStream(g_victoryMusic);
+
+    UnloadSound(g_mainMenuMusic);
+    UnloadSound(g_gameOverMusic);
+    UnloadSound(g_victoryMusic);
+
     CloseAudioDevice();
     g_hasMusicState = false;
     g_initialized = false;
@@ -85,34 +108,46 @@ void Shutdown() {
 void Update() {
     if (!g_initialized || g_currentMusic == nullptr) return;
 
-    UpdateMusicStream(*g_currentMusic);
-    float musicLength = GetMusicTimeLength(*g_currentMusic);
-    if (musicLength > 0.0f && GetMusicTimePlayed(*g_currentMusic) >= musicLength - 0.05f) {
-        StopMusicStream(*g_currentMusic);
-        PlayMusicStream(*g_currentMusic);
-        return;
-    }
-    if (!IsMusicStreamPlaying(*g_currentMusic)) {
-        PlayMusicStream(*g_currentMusic);
+    if (!IsSoundPlaying(*g_currentMusic)) {
+        PlaySound(*g_currentMusic);
     }
 }
 
 void SetMusicState(MusicState state) {
     if (!g_initialized) return;
-    if (g_currentMusic != nullptr && g_hasMusicState && g_currentMusicState == state) return;
+    Sound* nextMusic = GetMusicByState(state);
+    if (nextMusic == nullptr) return;
+
+    if (g_currentMusic != nullptr && g_hasMusicState && g_currentMusicState == state) {
+        SetSoundVolume(*g_currentMusic, GetMusicVolumeByState(state));
+        return;
+    }
+
+    if (g_currentMusic == nextMusic) {
+        g_currentMusicState = state;
+        g_hasMusicState = true;
+        SetSoundVolume(*g_currentMusic, GetMusicVolumeByState(state));
+        TraceLog(LOG_INFO, "AudioManager: adjusted music state %s", GetMusicStateLabel(state));
+        return;
+    }
 
     if (g_currentMusic != nullptr) {
-        StopMusicStream(*g_currentMusic);
+        StopSound(*g_currentMusic);
     }
 
     g_currentMusicState = state;
     g_hasMusicState = true;
-    g_currentMusic = GetMusicByState(state);
+    g_currentMusic = nextMusic;
+
     if (g_currentMusic != nullptr) {
-        SeekMusicStream(*g_currentMusic, 0.0f);
-        PlayMusicStream(*g_currentMusic);
-        UpdateMusicStream(*g_currentMusic);
+        SetSoundVolume(*g_currentMusic, GetMusicVolumeByState(state));
+        PlaySound(*g_currentMusic);
+        TraceLog(LOG_INFO, "AudioManager: playing music state %s", GetMusicStateLabel(state));
     }
+}
+
+const char* GetMusicStateName(MusicState state) {
+    return GetMusicStateLabel(state);
 }
 
 void PlayFireBall() { PlayLoadedSound(g_fireBall); }
